@@ -1,0 +1,7 @@
+
+model SystemConfig {
+  key         String   @id
+  value       String   // Parse as needed (Float, Int, String)
+  description String?
+  updatedAt   DateTime @updatedAt
+}

@@ -1,0 +1,543 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                        String                     @id @default(uuid())
+  memberId                  String?                    @unique
+  email                     String                     @unique
+  password                  String
+  fullName                  String
+  role                      String                     @default("USER")
+  adminStatus               String                     @default("ACTIVE")
+  accountStatus             String                     @default("ACTIVE")
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  phone                     String?
+  address                   String?
+  nextOfKinName             String?
+  nextOfKinPhone            String?
+  nextOfKinRelationship     String?
+  sponsorId                 String?
+  isActive                  Boolean                    @default(true)
+  kycStatus                 String                     @default("PENDING")
+  currentMonthPersonalSales Float                      @default(0.0)
+  currentYearPersonalSales  Float                      @default(0.0)
+  totalReferralCommission   Float                      @default(0.0)
+  auditLogsPerformed        AuditLog[]                 @relation("AuditPerformer")
+  cart                      Cart?
+  commissionsTriggered      CommissionLog[]            @relation("CommissionSource")
+  commissionsEarned         CommissionLog[]            @relation("CommissionBeneficiary")
+  eBonusLogs                EBonusLedger[]
+  eKreditLogs               EKreditLedger[]
+  eRebateLogs               ERebateLedger[]
+  exceptionLogs             ExceptionLogLedger[]
+  goldSales                 GoldSalesLedger[]
+  transactions              GoldTransaction[]
+  internalTransfers         InternalTransferLedger[]
+  kycSubmission             KycSubmission?
+  commissionsGiven          MemberCommissionLedger[]   @relation("LedgerSource")
+  commissionsReceived       MemberCommissionLedger[]   @relation("LedgerBeneficiary")
+  goldHoldings              MemberGoldHoldingLedger[]
+  membershipFees            MembershipFeeLedger[]
+  monthlyEligibility        MonthlyEligibilityLedger[]
+  notifications             Notification[]
+  postageFees               PostageHandlingLedger[]
+  redemptionRequests        RedemptionRequest[]
+  storageFees               StorageFeeLedger[]
+  supportMessages           SupportMessage[]
+  assignedTickets           SupportTicket[]            @relation("AssignedAdmin")
+  createdTickets            SupportTicket[]            @relation("TicketCreator")
+  topUpRequests             TopUpRequest[]
+  sponsor                   User?                      @relation("Referral", fields: [sponsorId], references: [id])
+  downlines                 User[]                     @relation("Referral")
+  wallet                    Wallet?
+  productOrders             ProductOrder[]
+  membershipExpiryDate      DateTime?
+}
+
+model Wallet {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  creditBalance Float    @default(0.0)
+  bonusBalance  Float    @default(0.0)
+  rebateBalance Float    @default(0.0)
+  goldBalance   Float    @default(0.0000)
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id])
+}
+
+model GoldTransaction {
+  id                   String          @id @default(uuid())
+  userId               String
+  type                 String
+  status               String          @default("PENDING")
+  gram                 Float
+  pricePerGram         Float
+  totalPrice           Float
+  discountAmount       Float           @default(0.0)
+  createdAt            DateTime        @default(now())
+  commissionsTriggered CommissionLog[]
+  user                 User            @relation(fields: [userId], references: [id])
+}
+
+model GoldPrice {
+  id        String   @id @default(uuid())
+  spotPrice Float    @default(0.0) // Raw Spot Price from API (MYR)
+  buy       Float    // Eeya Buy Price (999)
+  sell      Float    // Eeya Sell Price (999)
+  buy916    Float?   @default(0.0) // Calculated Shop Price
+  sell916   Float?   @default(0.0)
+  sellSpread Float   @default(8.3) // Percentage Markup
+  buySpread  Float   @default(5.0) // Percentage Markdown
+  timestamp DateTime @default(now())
+}
+
+model CompanyStock {
+  id               String   @id @default(uuid())
+  currentStockGram Float    @default(1000.0)
+  updatedAt        DateTime @updatedAt
+}
+
+model CommissionLog {
+  id            String          @id @default(uuid())
+  beneficiaryId String
+  sourceUserId  String
+  transactionId String
+  amount        Float
+  type          String
+  description   String
+  createdAt     DateTime        @default(now())
+  transaction   GoldTransaction @relation(fields: [transactionId], references: [id])
+  sourceUser    User            @relation("CommissionSource", fields: [sourceUserId], references: [id])
+  beneficiary   User            @relation("CommissionBeneficiary", fields: [beneficiaryId], references: [id])
+}
+
+model SupportTicket {
+  id           String           @id @default(uuid())
+  userId       String
+  assignedToId String?
+  category     String
+  status       String           @default("PENDING")
+  subject      String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  messages     SupportMessage[]
+  assignedTo   User?            @relation("AssignedAdmin", fields: [assignedToId], references: [id])
+  user         User             @relation("TicketCreator", fields: [userId], references: [id])
+}
+
+model SupportMessage {
+  id        String        @id @default(uuid())
+  ticketId  String
+  senderId  String
+  message   String
+  createdAt DateTime      @default(now())
+  sender    User          @relation(fields: [senderId], references: [id])
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id])
+}
+
+model SpecialFund {
+  id        String   @id @default("fund-1")
+  balance   Float    @default(0.0)
+  updatedAt DateTime @updatedAt
+}
+
+model SpecialFundLog {
+  id          String   @id @default(uuid())
+  amount      Float
+  type        String
+  description String
+  timestamp   DateTime @default(now())
+}
+
+model Product {
+  id          String     @id @default(uuid())
+  name        String
+  description String
+  price       Float
+  weight      Float
+  purity      String
+  imageUrl    String
+  shippingCost Float     @default(0.0)
+  workmanship  Float     @default(0.0)
+  status      String     @default("PENDING")
+  createdBy   String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  cartItems   CartItem[]
+  orders      ProductOrder[]
+}
+
+model ProductOrder {
+  id              String   @id @default(uuid())
+  userId          String
+  productId       String
+  priceAtPurchase Float // The locked gold price (916) per gram
+  workmanship     Float
+  shippingCost    Float
+  totalPaid       Float
+  weight          Float
+  status          String   @default("PAID")
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id])
+  product         Product  @relation(fields: [productId], references: [id])
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @unique
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id])
+  items     CartItem[]
+}
+
+model CartItem {
+  id        String  @id @default(uuid())
+  cartId    String
+  productId String
+  quantity  Int     @default(1)
+  product   Product @relation(fields: [productId], references: [id])
+  cart      Cart    @relation(fields: [cartId], references: [id])
+}
+
+model KycSubmission {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  icImageUrl      String
+  selfieUrl       String
+  status          String    @default("PENDING")
+  submittedAt     DateTime  @default(now())
+  reviewedAt      DateTime?
+  reviewedBy      String?
+  rejectionReason String?
+  user            User      @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  type      String   @default("INFO")
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  action      String
+  performedBy String
+  targetUser  String?
+  details     String?
+  timestamp   DateTime @default(now())
+  performer   User     @relation("AuditPerformer", fields: [performedBy], references: [id])
+}
+
+model TopUpRequest {
+  id              String    @id @default(uuid())
+  userId          String
+  amount          Float
+  proofImageUrl   String
+  status          String    @default("PENDING")
+  rejectionReason String?
+  approvedBy      String?
+  approvedAt      DateTime?
+  purpose         String    @default("E_CREDIT")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id])
+}
+
+model ShopExpense {
+  id          String   @id @default(uuid())
+  title       String
+  amount      Float
+  category    String
+  description String?
+  incurredAt  DateTime @default(now())
+  recordedBy  String
+}
+
+model BonusPayout {
+  id             String   @id @default(uuid())
+  title          String
+  totalAmount    Float
+  recipientCount Int
+  status         String   @default("PENDING")
+  periodStart    DateTime
+  periodEnd      DateTime
+  createdAt      DateTime @default(now())
+  processedBy    String?
+}
+
+model RedemptionRequest {
+  id              String   @id @default(uuid())
+  userId          String
+  grams           Float
+  shippingAddress String
+  status          String   @default("PENDING")
+  trackingNumber  String?
+  feeAmount       Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id])
+}
+
+model SystemConfig {
+  key         String   @id
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model AdminLedger {
+  id          String   @id @default(uuid())
+  amount      Float
+  type        String
+  category    String
+  description String?
+  createdAt   DateTime @default(now())
+  recordedBy  String?
+}
+
+model SpecialFeeFund {
+  id        String   @id @default("fee-fund-1")
+  balance   Float    @default(0.0)
+  updatedAt DateTime @updatedAt
+}
+
+model SpecialFeeLog {
+  id          String   @id @default(uuid())
+  amount      Float
+  type        String
+  description String
+  timestamp   DateTime @default(now())
+  performedBy String?
+}
+
+model Supplier {
+  supplierId  Int                  @id @default(autoincrement())
+  name        String
+  contactInfo String?
+  purchases   GoldPurchaseLedger[]
+}
+
+model GoldPurchaseLedger {
+  purchaseId  Int      @id @default(autoincrement())
+  supplierId  Int
+  date        DateTime @default(now())
+  weightGram  Float
+  costPerGram Float
+  totalRM     Float
+  status      String   @default("PENDING")
+  supplier    Supplier @relation(fields: [supplierId], references: [supplierId])
+}
+
+model GoldStockMasterLedger {
+  stockId     Int      @id @default(autoincrement())
+  refNo       String
+  date        DateTime @default(now())
+  inGram      Float    @default(0.0)
+  outGram     Float    @default(0.0)
+  balanceGram Float    @default(0.0)
+  costRM      Float    @default(0.0)
+}
+
+model MemberGoldHoldingLedger {
+  holdingId   Int      @id @default(autoincrement())
+  userId      String
+  date        DateTime @default(now())
+  refNo       String
+  inGram      Float    @default(0.0)
+  outGram     Float    @default(0.0)
+  balanceGram Float    @default(0.0)
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model GoldSalesLedger {
+  saleId        Int      @id @default(autoincrement())
+  userId        String
+  date          DateTime @default(now())
+  weightGram    Float
+  pricePerGram  Float
+  totalRM       Float
+  costRM        Float
+  grossProfit   Float
+  paymentMethod String
+  user          User     @relation(fields: [userId], references: [id])
+}
+
+model MemberCommissionLedger {
+  commissionId Int     @id @default(autoincrement())
+  userId       String
+  fromUserId   String?
+  refSales     String?
+  month        String
+  amountRM     Float
+  status       String
+  note         String?
+  fromUser     User?   @relation("LedgerSource", fields: [fromUserId], references: [id])
+  user         User    @relation("LedgerBeneficiary", fields: [userId], references: [id])
+}
+
+model EKreditLedger {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  date      DateTime @default(now())
+  refNo     String
+  inRM      Float    @default(0.0)
+  outRM     Float    @default(0.0)
+  balanceRM Float    @default(0.0)
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model EBonusLedger {
+  id       Int    @id @default(autoincrement())
+  userId   String
+  month    String
+  amountRM Float
+  status   String
+  user     User   @relation(fields: [userId], references: [id])
+}
+
+model ERebateLedger {
+  id       Int     @id @default(autoincrement())
+  userId   String
+  refPromo String?
+  amountRM Float
+  status   String
+  user     User    @relation(fields: [userId], references: [id])
+}
+
+model InternalTransferLedger {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  fromAccount String
+  toAccount   String
+  amountRM    Float
+  date        DateTime @default(now())
+  status      String
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model MembershipFeeLedger {
+  id       Int      @id @default(autoincrement())
+  userId   String
+  type     String
+  amountRM Float
+  date     DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id])
+}
+
+model StorageFeeLedger {
+  id       Int      @id @default(autoincrement())
+  userId   String
+  duration String
+  amountRM Float
+  date     DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id])
+}
+
+model OperatingCostLedger {
+  id          Int      @id @default(autoincrement())
+  category    String
+  amountRM    Float
+  description String?
+  recordedBy  String?
+  date        DateTime @default(now())
+}
+
+model PostageHandlingLedger {
+  id       Int      @id @default(autoincrement())
+  userId   String
+  ref      String
+  amountRM Float
+  date     DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id])
+}
+
+model SpecialFundLedger {
+  id        Int    @id @default(autoincrement())
+  month     String
+  source    String
+  inRM      Float  @default(0.0)
+  outRM     Float  @default(0.0)
+  balanceRM Float  @default(0.0)
+}
+
+model EquityRetainedEarningsLedger {
+  id             Int      @id @default(autoincrement())
+  date           DateTime @default(now())
+  initialCapital Float
+  netProfit      Float
+  dividend       Float
+  balance        Float
+}
+
+model MonthlyEligibilityLedger {
+  id          Int     @id @default(autoincrement())
+  userId      String
+  month       String
+  savedGram   Float
+  isQualified Boolean
+  user        User    @relation(fields: [userId], references: [id])
+}
+
+model StockAdjustmentLedger {
+  id       Int      @id @default(autoincrement())
+  refStock String
+  date     DateTime @default(now())
+  type     String
+  gram     Float
+  note     String?
+}
+
+model ExceptionLogLedger {
+  id     Int      @id @default(autoincrement())
+  type   String
+  userId String?
+  refNo  String?
+  date   DateTime @default(now())
+  status String
+  note   String?
+  user   User?    @relation(fields: [userId], references: [id])
+}
+
+model MonthlySnapshotLedger {
+  id            Int    @id @default(autoincrement())
+  month         String
+  physicalStock Float
+  memberStock   Float
+  totalEKredit  Float
+  totalEBonus   Float
+  totalDanaKhas Float
+}
+
+model Banner {
+  id        String   @id @default(uuid())
+  imageUrl  String
+  title     String?
+  linkUrl   String?
+  isActive  Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model CompanyProfile {
+  id                 String   @id @default("profile-1")
+  termsContent       String?
+  disclaimer         String?
+  directorName       String?
+  directorBio        String?
+  directorImageUrl   String?
+  companyName        String?
+  companyDescription String?
+  updatedAt          DateTime @updatedAt
+}

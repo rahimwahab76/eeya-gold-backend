@@ -1,0 +1,191 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  fullName  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Profile Fields
+  phone       String?
+  address     String?
+  
+  // Next of Kin
+  nextOfKinName         String?
+  nextOfKinPhone        String?
+  nextOfKinRelationship String?
+
+  // Wallets
+  wallet    Wallet?
+
+  // Affiliate / Commission Fields
+  sponsorId                   String?
+  sponsor                     User?     @relation("Referral", fields: [sponsorId], references: [id])
+  downlines                   User[]    @relation("Referral")
+  
+  // Admin Fields
+  isActive                    Boolean   @default(true) // Backend Toggle for "Vacation Mode"
+  assignedTickets             SupportTicket[] @relation("AssignedAdmin") // For Admin Support
+  createdTickets              SupportTicket[] @relation("TicketCreator") // For Users asking Qs
+  supportMessages             SupportMessage[]
+  
+  totalReferralCommission     Float     @default(0.0) // Cap tracker for Bonus 2 (Max 3000)
+  currentMonthPersonalSales   Float     @default(0.0) // Validator for Bonus 3, 4
+  currentYearPersonalSales    Float     @default(0.0) // Validator for Bonus 5
+
+  transactions     GoldTransaction[]
+  commissionsEarned CommissionLog[]   @relation("CommissionBeneficiary")
+  commissionsTriggered CommissionLog[] @relation("CommissionSource")
+}
+
+model Wallet {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  
+  creditBalance Float    @default(0.0) // e-Kredit: Deposits & Purchases
+  bonusBalance  Float    @default(0.0) // e-Bonus: Commissions
+  rebateBalance Float    @default(300.0) // e-Rebat: Welcome Bonus / Promo
+  
+  goldBalance   Float    @default(0.0000)
+  updatedAt     DateTime @updatedAt
+}
+
+model GoldTransaction {
+  id            String            @id @default(uuid())
+  userId        String
+  user          User              @relation(fields: [userId], references: [id])
+  type          TransactionType
+  status        TransactionStatus @default(PENDING)
+  gram          Float
+  pricePerGram  Float
+  totalPrice    Float             // Amount paid via e-Kredit
+  discountAmount Float            @default(0.0) // Amount covered by e-Rebat
+  createdAt     DateTime          @default(now())
+  
+  // Link to commission logs if this txn triggered any
+  commissionsTriggered CommissionLog[]
+}
+
+model GoldPrice {
+  id        String   @id @default(uuid())
+  buy       Float
+  sell      Float
+  timestamp DateTime @default(now())
+}
+
+model CompanyStock {
+  id        String   @id @default(uuid())
+  currentStockGram Float @default(1000.0) // Initial stock
+  updatedAt DateTime @updatedAt
+}
+
+enum CommissionType {
+  REFERRAL_0_5
+  PURCHASE_1_0
+  OTHER
+}
+
+model CommissionLog {
+  id              String   @id @default(uuid())
+  beneficiaryId   String
+  beneficiary     User     @relation("CommissionBeneficiary", fields: [beneficiaryId], references: [id])
+  sourceUserId    String
+  sourceUser      User     @relation("CommissionSource", fields: [sourceUserId], references: [id])
+  transactionId   String
+  transaction     GoldTransaction @relation(fields: [transactionId], references: [id])
+  
+  amount          Float
+  type            CommissionType
+  description     String
+  createdAt       DateTime @default(now())
+}
+
+model SupportTicket {
+  id            String          @id @default(uuid())
+  userId        String
+  user          User            @relation("TicketCreator", fields: [userId], references: [id])
+  
+  assignedToId  String?
+  assignedTo    User?           @relation("AssignedAdmin", fields: [assignedToId], references: [id])
+  
+  category      TicketCategory
+  status        TicketStatus    @default(PENDING)
+  subject       String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  
+  messages      SupportMessage[]
+}
+
+model SupportMessage {
+  id        String   @id @default(uuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id])
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  message   String
+  createdAt DateTime @default(now())
+}
+
+model SpecialFund {
+  id        String   @id @default("fund-1")
+  balance   Float    @default(0.0)
+  updatedAt DateTime @updatedAt
+}
+
+model SpecialFundLog {
+  id          String   @id @default(uuid())
+  amount      Float
+  type        String // IN / OUT
+  description String
+  timestamp   DateTime @default(now())
+}
+
+enum Role {
+  USER
+  SUPER_ADMIN
+  ADMIN_AUDIT
+  ADMIN_SUPPORT
+}
+
+enum TicketCategory {
+  TECHNICAL
+  SALES
+  COMPLAINT
+  COMMISSION
+  OTHER
+}
+
+enum TicketStatus {
+  PENDING
+  ANSWERED
+  CLOSED
+  RESOLVED
+}
+
+enum TransactionType {
+  BUY
+  SELL
+  BONUS
+  DEPOSIT_CASH
+  WITHDRAW_CASH
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
