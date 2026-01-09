@@ -11,7 +11,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "ls -R dist && node dist/main",
+    "start:prod": "echo \"[DEBUG] PWD:\" && pwd && echo \"[DEBUG] Root content:\" && ls -la && echo \"[DEBUG] Dist content:\" && ls -R dist && node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -20,7 +20,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "engines": {
-    "node": "20.x"
+    "node": "20.10.0"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
